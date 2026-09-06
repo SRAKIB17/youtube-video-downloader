@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { listDownloadedFiles, getDownloadsDir } from '@/lib/ytdlp';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function GET() {
   try {

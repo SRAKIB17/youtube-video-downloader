@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { getDownloadsDir } from '@/lib/ytdlp';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const filename = searchParams.get('filename');

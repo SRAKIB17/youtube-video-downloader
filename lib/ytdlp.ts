@@ -1,6 +1,6 @@
-"use server"
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { spawn, execSync } from 'child_process';
 
 export interface BinaryStatus {
@@ -54,61 +54,158 @@ export interface DownloadFile {
 }
 
 export async function findFfmpeg(): Promise<string | null> {
-  const rootDir = process.cwd();
-  const candidates = [
-    path.join(rootDir, 'ffmpeg.exe'),
-    path.join(rootDir, '.venv', 'Scripts', 'ffmpeg.exe'),
-    path.join(
-      process.env.LOCALAPPDATA || '',
-      'Microsoft',
-      'WinGet',
-      'Packages',
-      'yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe',
-      'ffmpeg-N-125875-g5d4d3bdc61-win64-gpl',
-      'bin',
-      'ffmpeg.exe'
-    )
-  ];
+  // 1. Windows local paths
+  if (process.platform === 'win32') {
+    const rootDir = process.cwd();
+    const candidates = [
+      path.join(rootDir, 'ffmpeg.exe'),
+      path.join(rootDir, '.venv', 'Scripts', 'ffmpeg.exe'),
+      path.join(
+        process.env.LOCALAPPDATA || '',
+        'Microsoft',
+        'WinGet',
+        'Packages',
+        'yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe',
+        'ffmpeg-N-125875-g5d4d3bdc61-win64-gpl',
+        'bin',
+        'ffmpeg.exe'
+      )
+    ];
 
-  for (const c of candidates) {
-    if (fs.existsSync(c)) {
-      return path.dirname(c);
+    for (const c of candidates) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ c)) {
+        return c;
+      }
     }
-  }
 
-  // Check if ffmpeg is in PATH
-  try {
-    const out = execSync('where ffmpeg.exe', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-    const firstLine = out.trim().split('\n')[0].trim();
-    if (firstLine && fs.existsSync(firstLine)) {
-      return path.dirname(firstLine);
+    try {
+      const out = execSync('where ffmpeg.exe', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const firstLine = out.trim().split('\n')[0].trim();
+      if (firstLine && fs.existsSync(/*turbopackIgnore: true*/ firstLine)) {
+        return firstLine;
+      }
+    } catch {}
+  } else {
+    // 2. Linux/macOS PATH or /tmp/bin
+    const tmpFfmpeg = path.join(os.tmpdir(), 'bin', 'ffmpeg');
+    if (fs.existsSync(/*turbopackIgnore: true*/ tmpFfmpeg)) {
+      return tmpFfmpeg;
     }
-  } catch {
-    // not in PATH
+
+    const linuxPaths = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg'];
+    for (const p of linuxPaths) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ p)) {
+        return p;
+      }
+    }
+
+    try {
+      const out = execSync('which ffmpeg', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+      if (out && fs.existsSync(/*turbopackIgnore: true*/ out)) {
+        return out;
+      }
+    } catch {}
   }
 
   return null;
 }
 
 export async function findYtDlp(): Promise<string> {
-  const rootDir = process.cwd();
-  const candidates = [
-    path.join(rootDir, 'yt-dlp.exe'),
-    path.join(rootDir, 'video', '.venv', 'Scripts', 'yt-dlp.exe'),
-    path.join(rootDir, '.venv', 'Scripts', 'yt-dlp.exe')
-  ];
+  // Windows local candidates
+  if (process.platform === 'win32') {
+    const rootDir = process.cwd();
+    const candidates = [
+      path.join(rootDir, 'yt-dlp.exe'),
+      path.join(rootDir, 'video', '.venv', 'Scripts', 'yt-dlp.exe'),
+      path.join(rootDir, '.venv', 'Scripts', 'yt-dlp.exe')
+    ];
 
-  for (const c of candidates) {
-    if (fs.existsSync(c)) {
-      return c;
+    for (const c of candidates) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ c)) {
+        return c;
+      }
     }
+
+    try {
+      const out = execSync('where yt-dlp.exe', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const firstLine = out.trim().split('\n')[0].trim();
+      if (firstLine && fs.existsSync(/*turbopackIgnore: true*/ firstLine)) {
+        return firstLine;
+      }
+    } catch {}
+
+    return 'yt-dlp';
+  }
+
+  // Linux / Serverless / Vercel
+  const tmpBin = path.join(os.tmpdir(), 'bin', 'yt-dlp');
+  if (fs.existsSync(/*turbopackIgnore: true*/ tmpBin)) {
+    try {
+      fs.chmodSync(tmpBin, 0o755);
+    } catch {}
+    return tmpBin;
+  }
+
+  // Check if yt-dlp is in PATH on Linux
+  try {
+    const out = execSync('which yt-dlp', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    if (out && fs.existsSync(/*turbopackIgnore: true*/ out)) {
+      return out;
+    }
+  } catch {}
+
+  // Auto-download standalone Linux yt-dlp binary to /tmp/bin
+  try {
+    const binDir = path.dirname(tmpBin);
+    if (!fs.existsSync(/*turbopackIgnore: true*/ binDir)) {
+      fs.mkdirSync(binDir, { recursive: true });
+    }
+
+    const response = await fetch('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp', {
+      redirect: 'follow'
+    });
+    if (response.ok) {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fs.writeFileSync(tmpBin, buffer);
+      try {
+        fs.chmodSync(tmpBin, 0o755);
+      } catch {}
+      return tmpBin;
+    }
+  } catch (err) {
+    console.error('Failed to auto-fetch Linux yt-dlp binary:', err);
   }
 
   return 'yt-dlp';
 }
 
+export function getYtDlpExtraArgs(): string[] {
+  const extraArgs: string[] = [];
+
+  // Cookies support for Vercel/Cloud to bypass YouTube bot detection
+  if (process.env.YTDLP_COOKIES) {
+    const cookiesPath = path.join(os.tmpdir(), 'cookies.txt');
+    try {
+      if (!fs.existsSync(cookiesPath) || fs.readFileSync(cookiesPath, 'utf8') !== process.env.YTDLP_COOKIES) {
+        fs.writeFileSync(cookiesPath, process.env.YTDLP_COOKIES, 'utf8');
+      }
+      extraArgs.push('--cookies', cookiesPath);
+    } catch {}
+  } else if (process.env.YTDLP_COOKIES_FILE && fs.existsSync(process.env.YTDLP_COOKIES_FILE)) {
+    extraArgs.push('--cookies', process.env.YTDLP_COOKIES_FILE);
+  }
+
+  // Proxy support to bypass datacenter IP restrictions
+  if (process.env.YTDLP_PROXY) {
+    extraArgs.push('--proxy', process.env.YTDLP_PROXY);
+  }
+
+  return extraArgs;
+}
+
 export async function getDownloadsDir(): Promise<string> {
-  const dir = path.join(process.cwd(), 'downloads');
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.platform === 'linux');
+  const dir = isServerless ? path.join(os.tmpdir(), 'downloads') : path.join(process.cwd(), 'downloads');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -128,21 +225,18 @@ export async function getBinaryStatus(): Promise<BinaryStatus> {
     ytdlpAvailable = false;
   }
 
-  const ffmpegDir = await findFfmpeg();
+  const ffmpegPath = await findFfmpeg();
   let ffmpegAvailable = false;
   let ffmpegVersion: string | null = null;
 
-  if (ffmpegDir) {
-    const ffmpegExe = path.join(ffmpegDir, 'ffmpeg.exe');
-    if (fs.existsSync(ffmpegExe)) {
-      try {
-        const out = execSync(`"${ffmpegExe}" -version`, { encoding: 'utf8' });
-        const firstLine = out.split('\n')[0].trim();
-        ffmpegAvailable = true;
-        ffmpegVersion = firstLine;
-      } catch {
-        ffmpegAvailable = false;
-      }
+  if (ffmpegPath && fs.existsSync(/*turbopackIgnore: true*/ ffmpegPath)) {
+    try {
+      const out = execSync(`"${ffmpegPath}" -version`, { encoding: 'utf8' });
+      const firstLine = out.split('\n')[0].trim();
+      ffmpegAvailable = true;
+      ffmpegVersion = firstLine;
+    } catch {
+      ffmpegAvailable = false;
     }
   }
 
@@ -154,7 +248,7 @@ export async function getBinaryStatus(): Promise<BinaryStatus> {
     },
     ffmpeg: {
       available: ffmpegAvailable,
-      path: ffmpegDir,
+      path: ffmpegPath,
       version: ffmpegVersion
     }
   };
@@ -162,10 +256,11 @@ export async function getBinaryStatus(): Promise<BinaryStatus> {
 
 export async function fetchVideoInfo(url: string): Promise<VideoInfo> {
   const ytdlpCmd = await findYtDlp();
-  const args = ['--dump-json', '--no-warnings', '--playlist-items', '1', url];
+  const extra = getYtDlpExtraArgs();
+  const args = ['--dump-json', '--no-warnings', '--playlist-items', '1', ...extra, url];
 
   return new Promise((resolve, reject) => {
-    const proc = spawn(ytdlpCmd, args);
+    const proc = spawn(/*turbopackIgnore: true*/ ytdlpCmd, args);
     let stdout = '';
     let stderr = '';
 

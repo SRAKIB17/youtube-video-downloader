@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
-import { findFfmpeg, findYtDlp, getDownloadsDir } from '@/lib/ytdlp';
+import { findFfmpeg, findYtDlp, getDownloadsDir, getYtDlpExtraArgs } from '@/lib/ytdlp';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   const downloadsDir = await getDownloadsDir();
   const ytdlpCmd = await findYtDlp();
   const ffmpegDir = await findFfmpeg();
+  const extraArgs = getYtDlpExtraArgs();
 
   // Determine output file template
   let outputTemplate: string;
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest) {
     '--no-warnings',
     '--newline',
     '--js-runtimes', 'node',
+    ...extraArgs,
     '-o', outputTemplate
   ];
 
