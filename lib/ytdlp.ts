@@ -212,7 +212,10 @@ export async function findYtDlp(): Promise<string> {
 }
 
 export function getYtDlpExtraArgs(): string[] {
-  const extraArgs: string[] = [];
+  const extraArgs: string[] = [
+    '--extractor-args',
+    'youtube:player_client=android,ios,mweb,web'
+  ];
 
   // Cookies support for Vercel/Cloud to bypass YouTube bot detection
   if (process.env.YTDLP_COOKIES) {
