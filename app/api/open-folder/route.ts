@@ -4,7 +4,7 @@ import { getDownloadsDir } from '@/lib/ytdlp';
 
 export async function POST() {
   try {
-    const dir = getDownloadsDir();
+    const dir = await getDownloadsDir();
     spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore' });
     return NextResponse.json({ success: true, dir });
   } catch (err: unknown) {

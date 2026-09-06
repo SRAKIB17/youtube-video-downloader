@@ -26,9 +26,9 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const downloadsDir = getDownloadsDir();
-  const ytdlpCmd = findYtDlp();
-  const ffmpegDir = findFfmpeg();
+  const downloadsDir = await getDownloadsDir();
+  const ytdlpCmd = await findYtDlp();
+  const ffmpegDir = await findFfmpeg();
 
   // Determine output file template
   let outputTemplate: string;

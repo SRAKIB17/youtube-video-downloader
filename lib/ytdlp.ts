@@ -53,7 +53,7 @@ export interface DownloadFile {
   isAudio: boolean;
 }
 
-export function findFfmpeg(): string | null {
+export async function findFfmpeg(): Promise<string | null> {
   const rootDir = process.cwd();
   const candidates = [
     path.join(rootDir, 'ffmpeg.exe'),
@@ -90,7 +90,7 @@ export function findFfmpeg(): string | null {
   return null;
 }
 
-export function findYtDlp(): string {
+export async function findYtDlp(): Promise<string> {
   const rootDir = process.cwd();
   const candidates = [
     path.join(rootDir, 'yt-dlp.exe'),
@@ -107,7 +107,7 @@ export function findYtDlp(): string {
   return 'yt-dlp';
 }
 
-export function getDownloadsDir(): string {
+export async function getDownloadsDir(): Promise<string> {
   const dir = path.join(process.cwd(), 'downloads');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -115,8 +115,8 @@ export function getDownloadsDir(): string {
   return dir;
 }
 
-export function getBinaryStatus(): BinaryStatus {
-  const ytdlpPath = findYtDlp();
+export async function getBinaryStatus(): Promise<BinaryStatus> {
+  const ytdlpPath = await findYtDlp();
   let ytdlpAvailable = false;
   let ytdlpVersion: string | null = null;
 
@@ -128,7 +128,7 @@ export function getBinaryStatus(): BinaryStatus {
     ytdlpAvailable = false;
   }
 
-  const ffmpegDir = findFfmpeg();
+  const ffmpegDir = await findFfmpeg();
   let ffmpegAvailable = false;
   let ffmpegVersion: string | null = null;
 
@@ -161,7 +161,7 @@ export function getBinaryStatus(): BinaryStatus {
 }
 
 export async function fetchVideoInfo(url: string): Promise<VideoInfo> {
-  const ytdlpCmd = findYtDlp();
+  const ytdlpCmd = await findYtDlp();
   const args = ['--dump-json', '--no-warnings', '--playlist-items', '1', url];
 
   return new Promise((resolve, reject) => {
@@ -240,8 +240,8 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-export function listDownloadedFiles(): DownloadFile[] {
-  const downloadsDir = getDownloadsDir();
+export async function listDownloadedFiles(): Promise<DownloadFile[]> {
+  const downloadsDir = await getDownloadsDir();
   try {
     const files = fs.readdirSync(downloadsDir);
     return files

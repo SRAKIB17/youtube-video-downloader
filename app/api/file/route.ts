@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   // Prevent directory traversal
   const safeFilename = path.basename(filename);
-  const filePath = path.join(getDownloadsDir(), safeFilename);
+  const filePath = path.join(await getDownloadsDir(), safeFilename);
 
   if (!fs.existsSync(filePath)) {
     return new NextResponse('File not found', { status: 404 });
@@ -86,7 +86,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   const safeFilename = path.basename(filename);
-  const filePath = path.join(getDownloadsDir(), safeFilename);
+  const filePath = path.join(await getDownloadsDir(), safeFilename);
 
   if (!fs.existsSync(filePath)) {
     return NextResponse.json({ success: false, error: 'File not found' }, { status: 404 });

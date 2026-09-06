@@ -3,8 +3,8 @@ import { getBinaryStatus, getDownloadsDir } from '@/lib/ytdlp';
 
 export async function GET() {
   try {
-    const status = getBinaryStatus();
-    const downloadsDir = getDownloadsDir();
+    const status = await getBinaryStatus();
+    const downloadsDir = await getDownloadsDir();
     return NextResponse.json({
       success: true,
       data: {

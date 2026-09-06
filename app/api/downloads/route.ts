@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const files = listDownloadedFiles();
-    const dir = getDownloadsDir();
+    const files = await listDownloadedFiles();
+    const dir = await getDownloadsDir();
     return NextResponse.json({
       success: true,
       data: {
