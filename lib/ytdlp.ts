@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawn, execSync } from 'child_process';
+import AdmZip from 'adm-zip';
 
 export interface BinaryStatus {
   ytdlp: {
@@ -89,6 +90,9 @@ export async function findFfmpeg(): Promise<string | null> {
     // 2. Linux/macOS PATH or /tmp/bin
     const tmpFfmpeg = path.join(os.tmpdir(), 'bin', 'ffmpeg');
     if (fs.existsSync(/*turbopackIgnore: true*/ tmpFfmpeg)) {
+      try {
+        fs.chmodSync(tmpFfmpeg, 0o755);
+      } catch {}
       return tmpFfmpeg;
     }
 
@@ -105,6 +109,29 @@ export async function findFfmpeg(): Promise<string | null> {
         return out;
       }
     } catch {}
+
+    // Auto-fetch static Linux ffmpeg from ffbinaries
+    try {
+      const binDir = path.dirname(tmpFfmpeg);
+      if (!fs.existsSync(/*turbopackIgnore: true*/ binDir)) {
+        fs.mkdirSync(binDir, { recursive: true });
+      }
+
+      const response = await fetch('https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v6.1/ffmpeg-6.1-linux-64.zip', {
+        redirect: 'follow'
+      });
+      if (response.ok) {
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const zip = new AdmZip(buffer);
+        zip.extractAllTo(binDir, true);
+        if (fs.existsSync(/*turbopackIgnore: true*/ tmpFfmpeg)) {
+          fs.chmodSync(tmpFfmpeg, 0o755);
+          return tmpFfmpeg;
+        }
+      }
+    } catch (fetchErr) {
+      console.error('Failed to download static ffmpeg:', fetchErr);
+    }
   }
 
   return null;
@@ -141,9 +168,14 @@ export async function findYtDlp(): Promise<string> {
   const tmpBin = path.join(os.tmpdir(), 'bin', 'yt-dlp');
   if (fs.existsSync(/*turbopackIgnore: true*/ tmpBin)) {
     try {
-      fs.chmodSync(tmpBin, 0o755);
+      const stat = fs.statSync(tmpBin);
+      // Ensure it's the full standalone binary (>10MB), not the small python script
+      if (stat.size > 10 * 1024 * 1024) {
+        fs.chmodSync(tmpBin, 0o755);
+        return tmpBin;
+      }
+      fs.unlinkSync(tmpBin);
     } catch {}
-    return tmpBin;
   }
 
   // Check if yt-dlp is in PATH on Linux
@@ -154,14 +186,14 @@ export async function findYtDlp(): Promise<string> {
     }
   } catch {}
 
-  // Auto-download standalone Linux yt-dlp binary to /tmp/bin
+  // Auto-download standalone Linux yt-dlp binary (yt-dlp_linux includes Python runtime)
   try {
     const binDir = path.dirname(tmpBin);
     if (!fs.existsSync(/*turbopackIgnore: true*/ binDir)) {
       fs.mkdirSync(binDir, { recursive: true });
     }
 
-    const response = await fetch('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp', {
+    const response = await fetch('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux', {
       redirect: 'follow'
     });
     if (response.ok) {
