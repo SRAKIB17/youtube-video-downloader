@@ -211,19 +211,19 @@ export async function findYtDlp(): Promise<string> {
   return 'yt-dlp';
 }
 
-export function getYtDlpExtraArgs(): string[] {
+export function getYtDlpExtraArgs(customCookies?: string): string[] {
   const extraArgs: string[] = [
+    '--no-check-certificates',
+    '--geo-bypass',
     '--extractor-args',
-    'youtube:player_client=android,ios,mweb,web'
+    'youtube:player_client=ios,android,mweb'
   ];
 
-  // Cookies support for Vercel/Cloud to bypass YouTube bot detection
-  if (process.env.YTDLP_COOKIES) {
+  const cookieData = (customCookies || process.env.YTDLP_COOKIES || '').trim();
+  if (cookieData) {
     const cookiesPath = path.join(os.tmpdir(), 'cookies.txt');
     try {
-      if (!fs.existsSync(cookiesPath) || fs.readFileSync(cookiesPath, 'utf8') !== process.env.YTDLP_COOKIES) {
-        fs.writeFileSync(cookiesPath, process.env.YTDLP_COOKIES, 'utf8');
-      }
+      fs.writeFileSync(cookiesPath, cookieData, 'utf8');
       extraArgs.push('--cookies', cookiesPath);
     } catch {}
   } else if (process.env.YTDLP_COOKIES_FILE && fs.existsSync(process.env.YTDLP_COOKIES_FILE)) {
@@ -289,9 +289,9 @@ export async function getBinaryStatus(): Promise<BinaryStatus> {
   };
 }
 
-export async function fetchVideoInfo(url: string): Promise<VideoInfo> {
+export async function fetchVideoInfo(url: string, cookies?: string): Promise<VideoInfo> {
   const ytdlpCmd = await findYtDlp();
-  const extra = getYtDlpExtraArgs();
+  const extra = getYtDlpExtraArgs(cookies);
   const args = ['--dump-json', '--no-warnings', '--playlist-items', '1', ...extra, url];
 
   return new Promise((resolve, reject) => {

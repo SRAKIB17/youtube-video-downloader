@@ -7,7 +7,7 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { url } = body;
+    const { url, cookies } = body;
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json(
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const info = await fetchVideoInfo(trimmedUrl);
+    const info = await fetchVideoInfo(trimmedUrl, cookies);
     return NextResponse.json({ success: true, data: info });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
     customFilename,
     embedThumbnail = true,
     embedSubtitles = false,
-    embedChapters = true
+    embedChapters = true,
+    cookies
   } = body;
 
   if (!url || typeof url !== 'string') {
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
   const downloadsDir = await getDownloadsDir();
   const ytdlpCmd = await findYtDlp();
   const ffmpegDir = await findFfmpeg();
-  const extraArgs = getYtDlpExtraArgs();
+  const extraArgs = getYtDlpExtraArgs(cookies);
 
   // Determine output file template
   let outputTemplate: string;

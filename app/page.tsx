@@ -91,6 +91,11 @@ export default function Home() {
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Cookies state for bypassing YouTube bot checks
+  const [userCookies, setUserCookies] = useState<string>('');
+  const [showCookieModal, setShowCookieModal] = useState<boolean>(false);
+  const [cookieInput, setCookieInput] = useState<string>('');
+
   // Configuration state
   const [downloadMode, setDownloadMode] = useState<'video' | 'audio'>('video');
   const [quality, setQuality] = useState<'best' | '2160p' | '1080p' | '720p' | '480p'>('best');
@@ -156,7 +161,33 @@ export default function Home() {
   useEffect(() => {
     fetchSystemStatus();
     fetchDownloadedFiles();
+    try {
+      const saved = localStorage.getItem('ytdlp_user_cookies');
+      if (saved) {
+        setUserCookies(saved);
+        setCookieInput(saved);
+      }
+    } catch {}
   }, []);
+
+  const handleSaveCookies = () => {
+    try {
+      const clean = cookieInput.trim();
+      localStorage.setItem('ytdlp_user_cookies', clean);
+      setUserCookies(clean);
+      setShowCookieModal(false);
+      setErrorMessage(null);
+    } catch {}
+  };
+
+  const handleClearCookies = () => {
+    try {
+      localStorage.removeItem('ytdlp_user_cookies');
+      setUserCookies('');
+      setCookieInput('');
+      setShowCookieModal(false);
+    } catch {}
+  };
 
   // Auto scroll terminal logs
   useEffect(() => {
@@ -183,7 +214,7 @@ export default function Home() {
       const res = await fetch('/api/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlToFetch })
+        body: JSON.stringify({ url: urlToFetch, cookies: userCookies })
       });
 
       const json = await res.json();
@@ -261,7 +292,8 @@ export default function Home() {
           customFilename: customFilename.trim() || undefined,
           embedThumbnail,
           embedChapters,
-          embedSubtitles
+          embedSubtitles,
+          cookies: userCookies
         })
       });
 
@@ -477,6 +509,18 @@ export default function Home() {
               <Cpu className="w-4 h-4" />
               <span>Diagnostics</span>
             </button>
+            <button
+              onClick={() => setShowCookieModal(true)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border ${
+                userCookies
+                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+                  : 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+              }`}
+              title="Configure YouTube Cookies for Cloud Serverless bypass"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>{userCookies ? 'Cookies Active ✓' : 'Bypass Bot Check'}</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-3 text-xs text-zinc-400">
@@ -563,15 +607,30 @@ export default function Home() {
               </div>
 
               {errorMessage && (
-                <div className="mt-4 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />
-                  <div className="flex-1">
-                    <span className="font-bold">Error Encountered: </span>
-                    {errorMessage}
+                <div className="mt-4 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />
+                    <div className="flex-1">
+                      <span className="font-bold">Error Encountered: </span>
+                      {errorMessage}
+                    </div>
+                    <button onClick={() => setErrorMessage(null)} className="text-zinc-400 hover:text-white">
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button onClick={() => setErrorMessage(null)} className="text-zinc-400 hover:text-white">
-                    <X className="w-4 h-4" />
-                  </button>
+                  {errorMessage.toLowerCase().includes('bot') && (
+                    <div className="pt-2 border-t border-red-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <span className="text-zinc-300">
+                        YouTube blocked this cloud server IP. Paste your cookies to bypass instantly:
+                      </span>
+                      <button
+                        onClick={() => setShowCookieModal(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition shadow-md shadow-red-600/30"
+                      >
+                        Add YouTube Cookies
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1356,6 +1415,98 @@ export default function Home() {
                 <Download className="w-4 h-4" />
                 Save File to Device
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cookies Modal for YouTube Bot Bypass */}
+      {showCookieModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative w-full max-w-xl glass-panel rounded-3xl p-6 sm:p-8 border border-white/15 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-red-600/20 text-red-400 border border-red-600/30">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base sm:text-lg text-white">Bypass YouTube Bot Check</h3>
+                  <p className="text-xs text-zinc-400">Configure Cookies for Cloud / Vercel Serverless</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCookieModal(false)}
+                className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-zinc-300">
+              <p className="leading-relaxed">
+                Cloud providers (Vercel, AWS, Render) are automatically flagged by YouTube with &quot;Sign in to confirm you&apos;re not a bot&quot;.
+                Providing your browser cookies authenticates your requests as a real human.
+              </p>
+
+              <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-white/10 space-y-2">
+                <p className="font-semibold text-zinc-200">How to get your cookies in 1 minute:</p>
+                <ol className="list-decimal list-inside space-y-1 text-zinc-400">
+                  <li>
+                    Install the free Chrome/Edge extension:{' '}
+                    <a
+                      href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-red-400 underline font-medium hover:text-red-300 inline-flex items-center gap-1"
+                    >
+                      Get cookies.txt LOCALLY <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </li>
+                  <li>Go to <a href="https://youtube.com" target="_blank" rel="noreferrer" className="text-red-400 underline">youtube.com</a> while signed in.</li>
+                  <li>Click the extension icon in your browser toolbar, then click <strong>Export</strong>.</li>
+                  <li>Paste the copied text below:</li>
+                </ol>
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 font-semibold mb-1.5">
+                  Cookies (Netscape format / cookies.txt):
+                </label>
+                <textarea
+                  value={cookieInput}
+                  onChange={(e) => setCookieInput(e.target.value)}
+                  placeholder="# Netscape HTTP Cookie File&#10;.youtube.com  TRUE  /  TRUE  ...  SID  ..."
+                  rows={6}
+                  className="w-full font-mono text-xs bg-zinc-950/90 border border-white/15 rounded-2xl p-3 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/10">
+              {userCookies ? (
+                <button
+                  onClick={handleClearCookies}
+                  className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-red-400 transition"
+                >
+                  Clear Stored Cookies
+                </button>
+              ) : <div />}
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => setShowCookieModal(false)}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCookies}
+                  disabled={!cookieInput.trim()}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold transition shadow-lg shadow-red-600/30"
+                >
+                  Save & Apply Cookies
+                </button>
+              </div>
             </div>
           </div>
         </div>
